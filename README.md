@@ -2,6 +2,10 @@
 
 Thoth is a **local-first, privacy-focused knowledge agent** that combines Retrieval-Augmented Generation (RAG) with multi-source information retrieval. It lets you upload your own documents, ask questions in a conversational chat interface, and get cited answers drawn from your documents, Wikipedia, Arxiv, and the web — all powered by a locally-running LLM via Ollama.
 
+### Why "Thoth"?
+
+In ancient Egyptian mythology, **Thoth** (𓁟) was the god of wisdom, writing, and knowledge — the divine scribe who recorded all human understanding. He was credited with inventing hieroglyphs, maintaining the library of the gods, and serving as the impartial judge of truth. Naming a private knowledge agent after Thoth felt fitting: like its namesake, this tool is built to gather, organize, and faithfully retrieve knowledge — while keeping everything under your control, running locally on your own machine.
+
 ---
 
 ## Features
