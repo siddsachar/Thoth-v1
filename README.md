@@ -17,16 +17,23 @@ In ancient Egyptian mythology, **Thoth** (𓁟) was the god of wisdom, writing, 
 - **Thread switching** — resume any previous conversation seamlessly
 - **Thread deletion** — remove conversations you no longer need
 
+### Model Selection
+- **Dynamic model switching** — choose any Ollama-supported model from the Settings panel in the sidebar
+- **Curated model list** — includes popular models (Llama, Qwen, Gemma, Mistral, DeepSeek, Phi, etc.) alongside any models you've already downloaded
+- **Automatic download** — selecting a model you haven't downloaded yet triggers an in-app download with a live progress indicator
+- **First-run setup** — if the default model isn't available, the app automatically downloads it on startup
+- **Local indicators** — models are marked with ✅ (downloaded) or ⬇️ (needs download) in the selector
+
 ### Intelligent Context Retrieval
 - **Smart context assessment** — an LLM-powered node decides whether additional context is needed before searching
 - **Accumulated context** — context from multiple queries within a thread builds up rather than being replaced
-- **Multi-source retrieval** with four parallel search backends:
+- **Configurable retrieval sources** — toggle each retrieval backend on/off from the Settings panel:
   | Source | Description |
   |--------|-------------|
-  | **Uploaded Documents** | FAISS vector similarity search over your indexed files |
-  | **Wikipedia** | Real-time Wikipedia article retrieval |
-  | **Arxiv** | Academic paper search via the Arxiv API |
-  | **Web Search** | Live web search via the Tavily Search API |
+  | **📄 Documents** | FAISS vector similarity search over your indexed files |
+  | **🌐 Wikipedia** | Real-time Wikipedia article retrieval |
+  | **📚 Arxiv** | Academic paper search via the Arxiv API |
+  | **🔍 Web Search** | Live web search via the Tavily Search API |
 - **Context compression** — retrieved content is compressed by the LLM to keep only relevant information while preserving source citations
 
 ### Document Management
@@ -114,10 +121,10 @@ Thoth/
 
 | File | Purpose |
 |------|---------|
-| **`app.py`** | Streamlit application with three-panel layout: sidebar (threads), center (chat), right (documents). Handles UI state, file uploads, and invokes the RAG graph. |
+| **`app.py`** | Streamlit application with three-panel layout: sidebar (threads + settings), center (chat), right (documents). Handles UI state, file uploads, model selection, retrieval source toggles, and invokes the RAG graph. |
 | **`rag.py`** | Defines the LangGraph state machine with `SessionState`, retriever initialization, context compression, and answer generation. Also supports a CLI mode via `__main__`. |
 | **`documents.py`** | Manages document ingestion: loading (PDF/DOCX/TXT), text splitting, embedding with `Qwen/Qwen3-Embedding-0.6B`, FAISS storage, and processed file tracking. |
-| **`models.py`** | Initializes the chat LLM (`ChatOllama` with `qwen3-vl:8b`). |
+| **`models.py`** | LLM model management — listing, downloading, and switching Ollama models at runtime. |
 | **`threads.py`** | SQLite-backed thread metadata (create, list, rename, delete) and LangGraph `SqliteSaver` checkpointer for persisting conversation state. |
 | **`api_keys.py`** | Sets environment variables for external API keys (Tavily). |
 
@@ -127,11 +134,9 @@ Thoth/
 
 - **Python 3.11+**
 - **[Ollama](https://ollama.com/)** installed and running locally
-- **Ollama model pulled**: `qwen3-vl:8b`
-  ```bash
-  ollama pull qwen3-vl:8b
-  ```
 - **Tavily API Key** for web search (set in `api_keys.py`)
+
+> **Note:** You no longer need to manually pull a model — the app will automatically download the default model (`qwen3:8b`) on first run if it isn't available.
 
 ---
 
@@ -185,7 +190,7 @@ streamlit run app.py
 ```
 
 This opens the Thoth web UI in your browser with:
-- **Left sidebar**: Create, switch, and delete conversation threads
+- **Left sidebar**: Create, switch, and delete conversation threads; Settings panel at the bottom for model selection and retrieval source toggles
 - **Center**: Chat interface for asking questions
 - **Right panel**: Upload and manage documents
 
@@ -203,7 +208,7 @@ This starts an interactive terminal session where you can select/create threads 
 
 1. **User asks a question** in the chat interface.
 2. The **`needs_context` node** evaluates whether the accumulated context from previous turns is sufficient or if new retrieval is needed.
-3. If new context is needed, the **`get_context` node** queries up to four sources:
+3. If new context is needed, the **`get_context` node** queries the enabled sources (configurable via Settings):
    - FAISS vector store (uploaded documents)
    - Wikipedia API
    - Arxiv API
@@ -218,9 +223,9 @@ This starts an interactive terminal session where you can select/create threads 
 ## Configuration
 
 ### LLM Model
-Change the model in `models.py`:
+Select a model directly from the **⚙️ Settings** panel in the sidebar. You can also change the default model in `models.py`:
 ```python
-llm = ChatOllama(model="qwen3-vl:8b")  # Change to any Ollama-supported model
+DEFAULT_MODEL = "qwen3:8b"  # Change to any Ollama-supported model
 ```
 
 ### Embedding Model

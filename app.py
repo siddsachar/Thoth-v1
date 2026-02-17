@@ -25,6 +25,29 @@ with st.spinner("Loading models. Please Wait…"):
         reset_vector_store,
         DocumentLoader,
     )
+    from models import (
+        get_current_model,
+        set_model,
+        list_all_models,
+        list_local_models,
+        is_model_local,
+        pull_model,
+        DEFAULT_MODEL,
+    )
+
+# ── Ensure default model is available ────────────────────────────────────────
+if not is_model_local(DEFAULT_MODEL):
+    with st.status(f"Downloading default model **{DEFAULT_MODEL}**…", expanded=True) as status:
+        for progress in pull_model(DEFAULT_MODEL):
+            total = int(progress.get("total", 0) if progress.get("total") else 0)
+            completed = int(progress.get("completed", 0) if progress.get("completed") else 0)
+            msg = progress.get("status", "")
+            if total:
+                pct = int(completed / total * 100)
+                status.update(label=f"Downloading {DEFAULT_MODEL}: {pct}%")
+            else:
+                status.update(label=f"{DEFAULT_MODEL}: {msg}")
+        status.update(label=f"✅ {DEFAULT_MODEL} ready!", state="complete")
 
 # ── Custom CSS ───────────────────────────────────────────────────────────────
 st.markdown(
@@ -88,13 +111,29 @@ if "messages" not in st.session_state:
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 
+if "search_documents" not in st.session_state:
+    st.session_state.search_documents = True
+if "search_wikipedia" not in st.session_state:
+    st.session_state.search_wikipedia = True
+if "search_arxiv" not in st.session_state:
+    st.session_state.search_arxiv = True
+if "search_web" not in st.session_state:
+    st.session_state.search_web = True
+
+if "current_model" not in st.session_state:
+    st.session_state.current_model = get_current_model()
+
+# Always sync module-level model state from session state (survives reruns & refreshes)
+if get_current_model() != st.session_state.current_model:
+    set_model(st.session_state.current_model)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # LEFT SIDEBAR – Thread Manager
 # ═════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.title("𓁟 Thoth")
-    st.caption("Private Knowledge Agent")
+    st.caption("God of Wisdom, Writing, and Knowledge\nYour Private Knowledge Agent")
     st.divider()
 
     # New thread button
@@ -135,6 +174,62 @@ with st.sidebar:
                     st.session_state.thread_name = None
                     st.session_state.messages = []
                 st.rerun()
+
+    # ── Settings popover pinned to bottom of sidebar ─────────────────────────
+    st.markdown(
+        """<div style="position: fixed; bottom: 1rem; width: inherit; z-index: 200;">""",
+        unsafe_allow_html=True,
+    )
+    with st.popover("⚙️ Settings", use_container_width=True):
+        st.markdown("#### Model")
+        all_models = list_all_models()
+        local_models = list_local_models()
+        current = st.session_state.current_model
+        if current not in all_models:
+            all_models = sorted(set(all_models + [current]))
+        idx = all_models.index(current) if current in all_models else 0
+
+        selected_model = st.selectbox(
+            "Select model",
+            options=all_models,
+            index=idx,
+            format_func=lambda m: f"{'✅' if m in local_models else '⬇️'}  {m}",
+            label_visibility="collapsed",
+        )
+
+        st.divider()
+        st.markdown("#### Retrieval Sources")
+        st.session_state.search_documents = st.toggle(
+            "📄 Documents", value=st.session_state.search_documents, key="toggle_documents"
+        )
+        st.session_state.search_wikipedia = st.toggle(
+            "🌐 Wikipedia", value=st.session_state.search_wikipedia, key="toggle_wikipedia"
+        )
+        st.session_state.search_arxiv = st.toggle(
+            "📚 Arxiv", value=st.session_state.search_arxiv, key="toggle_arxiv"
+        )
+        st.session_state.search_web = st.toggle(
+            "🔍 Web Search", value=st.session_state.search_web, key="toggle_web"
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Handle model switch ──────────────────────────────────────────────────
+    if selected_model and selected_model != st.session_state.current_model:
+        if not is_model_local(selected_model):
+            with st.status(f"Downloading **{selected_model}**…", expanded=True) as status:
+                for progress in pull_model(selected_model):
+                    total = int(progress.get("total", 0) if progress.get("total") else 0)
+                    completed = int(progress.get("completed", 0) if progress.get("completed") else 0)
+                    msg = progress.get("status", "")
+                    if total:
+                        pct = int(completed / total * 100)
+                        status.update(label=f"Downloading {selected_model}: {pct}%")
+                    else:
+                        status.update(label=f"{selected_model}: {msg}")
+                status.update(label=f"✅ {selected_model} ready!", state="complete")
+        set_model(selected_model)
+        st.session_state.current_model = selected_model
+        st.rerun()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -186,7 +281,13 @@ with chat_col:
             with st.chat_message("assistant"):
                 with st.spinner("Thinking…"):
                     result = rag_graph_compiled.invoke(
-                        {"messages": [("human", user_input)]},
+                        {
+                            "messages": [("human", user_input)],
+                            "search_documents": st.session_state.search_documents,
+                            "search_wikipedia": st.session_state.search_wikipedia,
+                            "search_arxiv": st.session_state.search_arxiv,
+                            "search_web": st.session_state.search_web,
+                        },
                         config=config,
                     )
                     answer = result["answer"].content

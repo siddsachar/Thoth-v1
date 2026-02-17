@@ -1,7 +1,7 @@
 from multiprocessing import context
 from langchain_core.prompts import ChatPromptTemplate
 from documents import vector_store
-from models import llm
+from models import get_llm
 from api_keys import set_keys
 from langchain_community.retrievers.wikipedia import WikipediaRetriever
 from langchain_community.retrievers.arxiv import ArxivRetriever
@@ -31,6 +31,10 @@ class SessionState(TypedDict):
     context: Annotated[list[str], operator.add]
     answer: str
     messages: Annotated[list, add_messages]
+    search_documents: bool
+    search_wikipedia: bool
+    search_arxiv: bool
+    search_web: bool
 
 
 def needs_context(state: SessionState):
@@ -41,7 +45,7 @@ def needs_context(state: SessionState):
     Does the question require additional context to answer accurately?  
     **Respond with 'Yes' or 'No' only.**
     """
-    response = llm.invoke(prompt)
+    response = get_llm().invoke(prompt)
     print(f"LLM response for needs_context: {response.content}")
     if response.content.strip().lower() == "yes":
         return {"needs_context" : True}
@@ -54,12 +58,17 @@ def needs_context_condition(state: SessionState):
     else:
         return "generate_answer"
 
-def get_context(state: SessionState, search_documents=True, search_wikipedia=True, search_arxiv=True, search_web=True):
+def get_context(state: SessionState):
+    search_documents = state.get("search_documents", True)
+    search_wikipedia = state.get("search_wikipedia", True)
+    search_arxiv = state.get("search_arxiv", True)
+    search_web = state.get("search_web", True)
     print("Retrieving context for question:", state["messages"][-1].content)
     query = state["messages"][-1].content
 
     def safe_invoke(retriever, label: str):
         try:
+            print(f"Invoking {label} retriever...")
             return retriever.invoke(query)
         except Exception as exc:
             print(f"{label} retriever failed: {exc}")
@@ -93,7 +102,7 @@ def get_context(state: SessionState, search_documents=True, search_wikipedia=Tru
     - Keep the source information with the content from that source. like this example: "The Eiffel Tower is located in Paris. (Source: https://en.wikipedia.org/wiki/Paris)"
     - Provide the compressed context without any additional commentary."""
     
-    compressed_context = llm.invoke(compression_prompt).content.strip()
+    compressed_context = get_llm().invoke(compression_prompt).content.strip()
 
     return {"context": [compressed_context]}
 
@@ -107,7 +116,7 @@ def generate_answer(state: SessionState):
     context_text = "\n\n".join(state.get("context", [])) or "No context available"
     input = prompt.format(context=context_text, question=state["messages"][-1].content )
     print(f"Prompt for answer generation:\n{input}\n")
-    answer = llm.invoke(input)
+    answer = get_llm().invoke(input)
     return {"answer": answer, "messages": [answer]}
 
 rag_graph = StateGraph(SessionState)
